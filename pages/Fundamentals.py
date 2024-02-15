@@ -438,7 +438,7 @@ def plot_bias(causal_data, n_show=N_SHOW):
     plt.grid()
     plt.legend(loc="lower right")
 
-    plt.title(f"BIAS\nE[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
+    plt.title(f"BIAS\n$E[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
     return BIAS
 
 
