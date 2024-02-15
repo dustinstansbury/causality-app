@@ -11,32 +11,35 @@ import seaborn as sns
 
 
 """
-# Fundamentals
+# Definitions & Notation
 
-## Definitions & Notation
+## 🪄 Potential Outcomes
+
+### On Wizardry
+
+
+- $Y_{0i}$ is the potential outcome for unit $i$ in the absence of the treatment. If we were to observe that the unit did not receive the treatment, this is a **factual potential outcome**
+- $Y_{1i}$ is the potential outcome for the same unit in the precsence of the treatment. When we observe that the unit did not receive the treatment, this is a **counterfactual potential outcome**
+
+
 """
 
-"""### Observed Outcomes $Y_i$"""
+show_pe_code = st.checkbox("Show `potential_outcomes` as code")
+if show_pe_code:
+    st.code(
+        body="""
+        import pandas as pd
+        import numpy as np
+        
+        # Initialize a demo dataset, individuals indexed by `i`
+        causal_data = pd.DataFrame()
+        causal_data.index.name = "i"
 
-
-"""### 🪄 Potential Outcomes ($Y_{1,0}$)"""
-
-# show_pe_code = st.checkbox("Show `potential_outcomes` as code")
-# if show_pe_code:
-st.code(
-    body="""
-    import pandas as pd
-    import numpy as np
-    
-    # Initialize a demo dataset, individuals indexed by `i`
-    causal_data = pd.DataFrame()
-    causal_data.index.name = "i"
-
-    # Assign potential outcomes for 4 individuals
-    causal_data["Y0"] = (500, 600, 700, 800)
-    causal_data["Y1"] = (450, 650, 850, 750)
-    """
-)
+        # Assign potential outcomes for 4 individuals
+        causal_data["Y0"] = (500, 600, 700, 800)
+        causal_data["Y1"] = (450, 650, 850, 750)
+        """
+    )
 
 # Initialize a demo dataset, individuals indexed by `i`
 causal_data = pd.DataFrame()
@@ -255,7 +258,7 @@ st.write(bias(causal_data))
 
 
 def generate_causal_data(
-    n_points=50,
+    n_points=3,
     beta_confound=1,
     beta_assignment=0,
     ate=0.5,
@@ -271,8 +274,12 @@ def generate_causal_data(
     X = np.random.randn(n_points)
 
     # Treatment is function of X
+
+    log_odds = beta_assignment * X
+    # T = log_odds > 0
+
     np.random.seed(random_seed)
-    p_treatment = logistic(beta_assignment * X)
+    p_treatment = logistic(log_odds)
     T = stats.bernoulli.rvs(p=p_treatment)
 
     # Random indvidual treatment effects distributed around ATE
@@ -322,27 +329,20 @@ with rparam_col:
 Y0_COLORS = ["darkblue", "lightgreen"]
 Y1_COLORS = ["lightblue", "darkgreen"]
 MARKER_SIZE = 100
-N_SHOW = 50
+N_SHOW = 25
 DATA_RANGE = 3.5
-
-
-def _plot_every(n_samples, resolution=50):
-    if n_samples > resolution:
-        return n_samples // resolution
-    return 1
 
 
 def plot_observed(causal_data, n_show=N_SHOW):
     treatment_means = []
 
-    plot_every = _plot_every(len(causal_data), n_show)
     for T in (0, 1):
         treatment_data = causal_data[causal_data["T"] == T]
         treatment_means.append(treatment_data["Y"].mean())
 
         color = Y1_COLORS[T] if (T == 1) else Y0_COLORS[T]
         sns.scatterplot(
-            treatment_data.iloc[::plot_every],
+            treatment_data.iloc[:n_show],
             x="X",
             y=f"Y{T}",
             s=MARKER_SIZE,
@@ -362,14 +362,13 @@ def plot_observed(causal_data, n_show=N_SHOW):
     plt.xlabel("$X$")
     plt.ylabel("$Y$")
     plt.legend(loc="lower right")
-    plt.title(f"Observed ASSOCIATION\n$E[Y|T=1] - E[Y|T=0]$ = {ASSOCIATION:0.3}")
+    plt.title(f"ASSOCIATION\n$E[Y|T=1] - E[Y|T=0]$ = {ASSOCIATION:0.3}")
     return ASSOCIATION
 
 
 def plot_counterfactuals(causal_data, n_show=N_SHOW):
-    plot_every = _plot_every(len(causal_data), n_show)
     for T in (0, 1):
-        treatment_data = causal_data[causal_data["T"] == T].iloc[::plot_every]
+        treatment_data = causal_data[causal_data["T"] == T].iloc[:n_show]
         sns.scatterplot(
             treatment_data,
             x="X",
@@ -399,26 +398,25 @@ def plot_counterfactuals(causal_data, n_show=N_SHOW):
                 label=label,
             )
 
-    ATET = treatement_effect_on_treated(causal_data).mean()
+    ATT = treatement_effect_on_treated(causal_data).mean()
 
     plt.xlim((-DATA_RANGE, DATA_RANGE))
     plt.ylim((-DATA_RANGE, DATA_RANGE))
     plt.xlabel("$X$")
     plt.ylabel("$Y$")
     plt.grid()
-    plt.legend(loc="lower right")
-    plt.title(f"Individual Treatment Effects\nATET=$E[Y_1-Y_0|T=1]$ = {ATET:0.3}")
+    plt.legend(loc="lower right", title="Individual\nTreatment\nEffects")
+    plt.title(f"ATT\n$E[Y_1-Y_0|T=1]$ = {ATT:0.3}")
 
-    return ATET
+    return ATT
 
 
 def plot_bias(causal_data, n_show=N_SHOW):
     treatment_means = []
-    plot_every = _plot_every(len(causal_data), n_show)
     for T in (0, 1):
         treatment_data = causal_data[causal_data["T"] == T]
         sns.scatterplot(
-            treatment_data.iloc[::plot_every],
+            treatment_data.iloc[:n_show],
             x="X",
             y="Y0",
             s=MARKER_SIZE,
@@ -440,12 +438,12 @@ def plot_bias(causal_data, n_show=N_SHOW):
     plt.grid()
     plt.legend(loc="lower right")
 
-    plt.title(f"BIAS = $E[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
+    plt.title(f"BIAS\nE[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
     return BIAS
 
 
 causal_data = generate_causal_data(
-    n_points=1000,
+    n_points=10000,
     beta_confound=outcome_confounding,
     beta_assignment=assignment_confounding,
     ate=ate,
@@ -457,23 +455,24 @@ causal_data = generate_causal_data(
 fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 
 plt.sca(axs[0])
-ASSOCIATION = plot_observed(causal_data)
+BIAS = plot_bias(causal_data)
 
 plt.sca(axs[1])
-ATET = plot_counterfactuals(causal_data)
+ATT = plot_counterfactuals(causal_data)
 
 plt.sca(axs[2])
-BIAS = plot_bias(causal_data)
+ASSOCIATION = plot_observed(causal_data)
+
 
 plt.margins(tight=True)
 
 st.pyplot(fig)
 
-assert np.isclose(ASSOCIATION, ATET + BIAS, atol=0.01)
+assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
 
 st.code(
     """
-assert np.isclose(ASSOCIATION, ATET + BIAS, atol=0.01)
+assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
 """
 )
 
