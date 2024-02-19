@@ -10,11 +10,13 @@ from scipy import stats
 import seaborn as sns
 
 
-SHOW_ALL_CODE = st.checkbox("Show all code cells", value=True)
+SHOW_CODE = st.sidebar.checkbox("Show/hide code examples", value=True)
 
 
-"""
-# Introduction to Causality
+# TODO: Making these TOCs by hand does not scale well
+st.sidebar.markdown(
+    """
+# Table of Contents
 
 [The Fundamental Problem of Causal Inference](#the-fundamental-problem-of-causal-inference)
 - [Treatments and Observed Outcomes](#treatments-and-observed-outcomes)
@@ -24,12 +26,15 @@ SHOW_ALL_CODE = st.checkbox("Show all code cells", value=True)
 - [Average Treatment Effect](#average-treatment-effect)
 - [Average Treatment Effect on the Treated](#average-treatment-effect-on-the-treated)
 
-[Association, Bias, & Causation](#association-bias-causation)
-- [Association](#association-aaa)
+[Causation vs Association](#causation-vs-association)
+- [Association](#association)
 - [Bias](#bias)
 - [When Association is Causation](#when-association-is-causation)
+"""
+)
 
 
+"""
 ## The Fundamental Problem of Causal Inference
 
 ### Treatments and Observed Outcomes
@@ -45,25 +50,8 @@ $Y_i$ is the observed outcome for the individual $i$
 
 """
 
-# Initialize a demo causal dataset, individuals indexed by `i`
-causal_data = pd.DataFrame()
-causal_data = pd.DataFrame(index=(1, 2, 3, 4))
-causal_data.index.name = "i"
 
-# Assign Treatments
-treatment = (0, 0, 1, 1)
-causal_data["T"] = treatment
-
-# Observed Outcomes
-observed_outcomes = (500, 600, 850, 750)
-causal_data["Y"] = observed_outcomes
-
-st.dataframe(causal_data.head())
-
-show_oo_code = st.checkbox(
-    "Show **Treatments** and **Observed Outcomes** as code", value=SHOW_ALL_CODE
-)
-if show_oo_code:
+if SHOW_CODE:
     st.code(
         """
     import pandas as pd
@@ -85,6 +73,22 @@ if show_oo_code:
     """
     )
 
+# Initialize a demo causal dataset, individuals indexed by `i`
+causal_data = pd.DataFrame()
+causal_data = pd.DataFrame(index=(1, 2, 3, 4))
+causal_data.index.name = "i"
+
+# Assign Treatments
+treatment = (0, 0, 1, 1)
+causal_data["T"] = treatment
+
+# Observed Outcomes
+observed_outcomes = (500, 600, 850, 750)
+causal_data["Y"] = observed_outcomes
+
+st.dataframe(causal_data.head())
+
+
 """
 
 ### Potential Outcomes
@@ -96,6 +100,17 @@ if show_oo_code:
 
 """
 
+if SHOW_CODE:
+    st.code(
+        body="""
+
+        # Assign potential outcomes for 4 the individuals
+        causal_data["Y0"] = (500, 600, 700, 800)
+        causal_data["Y1"] = (450, 650, 850, 750)
+        causal_data.head()
+        """
+    )
+
 # Assign potential outcomes for 4 individuals
 causal_data["Y0"] = (500, 600, 700, 800)
 causal_data["Y1"] = (450, 650, 850, 750)
@@ -103,7 +118,8 @@ causal_data["Y1"] = (450, 650, 850, 750)
 
 def highlight_potential_outcomes(data):
     """
-    Highlight the counterfactual cells
+    Highlight the counterfactual cells. Note that this is not shown in the
+    code blocks.
     """
 
     # Empty DF with no styling
@@ -128,19 +144,6 @@ def highlight_potential_outcomes(data):
 st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
 
 
-show_po_code = st.checkbox("Show **Potential_outcomes** as code", value=SHOW_ALL_CODE)
-if show_po_code:
-    st.code(
-        body="""
-
-        # Assign potential outcomes for 4 the individuals
-        causal_data["Y0"] = (500, 600, 700, 800)
-        causal_data["Y1"] = (450, 650, 850, 750)
-        causal_data.head()
-        """
-    )
-
-
 """### Individual Treatment Effect"""
 
 st.markdown(
@@ -159,6 +162,23 @@ ${TE}_4$ = :green[750] - :blue[800] = -50
 """
 )
 
+if SHOW_CODE:
+    st.code(
+        body="""
+        def TE(causal_data):
+            '''
+            Treatment Effect, TE
+                TE = Y1 - Y0
+            '''
+            Y1 = causal_data["Y1"]
+            Y0 = causal_data["Y0"]
+            return Y1 - Y0
+
+        causal_data["TE"] = TE(causal_data)
+        causal_data.head()
+        """
+    )
+
 
 def TE(causal_data):
     """
@@ -176,24 +196,6 @@ st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
 # st.dataframe(causal_data)
 
 
-show_te_code = st.checkbox("Show **Treatement Effect** as code", value=SHOW_ALL_CODE)
-if show_te_code:
-    st.code(
-        body="""
-        def TE(causal_data):
-            '''
-            Treatment Effect, TE
-                TE = Y1 - Y0
-            '''
-            Y1 = causal_data["Y1"]
-            Y0 = causal_data["Y0"]
-            return Y1 - Y0
-
-        causal_data["TE"] = TE(causal_data)
-        causal_data.head()
-        """
-    )
-
 """
 ### Treatment Effect on Treated (TET)
 
@@ -202,26 +204,7 @@ TET = Y_1 - Y_0|T = 1
 $$
 """
 
-
-def TET(causal_data):
-    """
-    Treatment Effect on Treated, TET:
-        TET = (Y1 - Y0) | T=1
-    """
-    T1 = causal_data["T"] == 1
-    Y1_T1 = causal_data[T1]["Y1"]
-    Y0_T1 = causal_data[T1]["Y0"]
-    return Y1_T1 - Y0_T1
-
-
-causal_data["TET"] = TET(causal_data)
-# st.dataframe(causal_data)
-st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
-
-show_tet_code = st.checkbox(
-    "Show **Treatment Effect on Treated** as code", value=SHOW_ALL_CODE
-)
-if show_tet_code:
+if SHOW_CODE:
     st.code(
         body="""
         def TET(causal_data):
@@ -241,6 +224,22 @@ if show_tet_code:
     )
 
 
+def TET(causal_data):
+    """
+    Treatment Effect on Treated, TET:
+        TET = (Y1 - Y0) | T=1
+    """
+    T1 = causal_data["T"] == 1
+    Y1_T1 = causal_data[T1]["Y1"]
+    Y0_T1 = causal_data[T1]["Y0"]
+    return Y1_T1 - Y0_T1
+
+
+causal_data["TET"] = TET(causal_data)
+# st.dataframe(causal_data)
+st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
+
+
 """### Average Treatment Effect
 
 #### WIP
@@ -253,7 +252,7 @@ if show_tet_code:
 """
 
 
-"""### Association, Bias, & Causation"""
+"""### Causation vs Association"""
 
 
 """
@@ -272,8 +271,7 @@ st.latex(
 )
 
 
-show_assoc_code = st.checkbox("Show **Association** as code", value=SHOW_ALL_CODE)
-if show_assoc_code:
+if SHOW_CODE:
     st.code(
         body="""
         def association(causal_data):
@@ -328,8 +326,7 @@ where neither group receives the treatment.
 st.latex("E[Y_0|T=1] - E[Y_0|T=0]")
 
 
-show_bias_code = st.checkbox("Show **Bias** as code", value=SHOW_ALL_CODE)
-if show_bias_code:
+if SHOW_CODE:
     st.code(
         body="""
         def bias(causal_data):
@@ -371,10 +368,7 @@ assert np.isclose(
     association(causal_data), TET(causal_data).mean() + bias(causal_data), atol=0.01
 )
 
-show_assoc_assert_code = st.checkbox(
-    "Demonstrate the Association relationship in code", value=SHOW_ALL_CODE
-)
-if show_assoc_assert_code:
+if SHOW_CODE:
 
     st.code(
         """
