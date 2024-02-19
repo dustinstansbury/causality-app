@@ -10,32 +10,30 @@ from scipy import stats
 import seaborn as sns
 
 
-SHOW_CODE = st.sidebar.checkbox("Show/hide code examples", value=True)
+SHOW_CODE = st.sidebar.toggle("Show/hide Python Code", value=True)
 
 
 # TODO: Making these TOCs by hand does not scale well
 st.sidebar.markdown(
     """
-# Table of Contents
 
-[The Fundamental Problem of Causal Inference](#the-fundamental-problem-of-causal-inference)
-- [Treatments and Observed Outcomes](#treatments-and-observed-outcomes)
-- [Potential Outcomes](#potential-outcomes)
-- [Individual Treatment Effect](#individual-treatment-effect)
-- [Treatment Effect on the Treated](#treatment-effect-on-treated-tet)
-- [Average Treatment Effect](#average-treatment-effect)
-- [Average Treatment Effect on the Treated](#average-treatment-effect-on-the-treated)
-
-[Causation vs Association](#causation-vs-association)
-- [Association](#association)
-- [Bias](#bias)
-- [When Association is Causation](#when-association-is-causation)
+[Treatments and Observed Outcomes](#treatments-and-observed-outcomes) \\
+[Potential Outcomes](#potential-outcomes) \\
+[Individual Treatment Effect](#individual-treatment-effect-te) \\
+[Treatment Effect on the Treated](#treatment-effect-on-treated-tet) \\
+[Average Treatment Effect](#average-treatment-effect-ate) \\
+[Average Treatment Effect on the Treated](#average-treatment-effect-on-the-treated-att) \\
+[Causation vs Association](#causation-vs-association) \\
+a. [Bias](#bias-b) \\
+b. [Association](#association-a) \\
+c. [When Association is Causation](#when-association-is-causation) \\
+[Ineractive Demo](#interactive-demo)
 """
 )
 
 
 """
-## The Fundamental Problem of Causal Inference
+## Potential Outcomes & the Fundamental Problem of Causal Inference
 
 ### Treatments and Observed Outcomes
 
@@ -144,7 +142,7 @@ def highlight_potential_outcomes(data):
 st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
 
 
-"""### Individual Treatment Effect"""
+"""### Individual Treatment Effect (TE)"""
 
 st.markdown(
     """
@@ -195,6 +193,11 @@ causal_data["TE"] = TE(causal_data)
 st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
 # st.dataframe(causal_data)
 
+"""
+### Average Treatment Effect (ATE)
+
+#### WIP
+"""
 
 """
 ### Treatment Effect on Treated (TET)
@@ -240,23 +243,79 @@ causal_data["TET"] = TET(causal_data)
 st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
 
 
-"""### Average Treatment Effect
+"""
 
-#### WIP
-
-
-### Average Treatment Effect on the Treated
+### Average Treatment Effect on the Treated (ATT)
 
 #### WIP
 
 """
 
 
-"""### Causation vs Association"""
+def ATT(causal_data):
+    return TET(causal_data).mean()
+
+
+"""## Causation vs Association"""
 
 
 """
-#### Association
+### Bias (B)
+
+In the real world individuals vary on countless dimensions, not just the
+dimensions that we decide to intervene on. These additional dimensions can vary
+in conjunction with the treatment. We can think of **Bias** as capturing the
+inherent differences in the control and variation groups that cannot be accounted
+for directly by the treatment.
+
+We can formally define bias as the difference in the average outcome between the
+control group ($T=0$) and variation group ($T=1)$ in the (counterfactual) world
+where neither group receives the treatment.
+
+
+$$
+B = E[Y_0|T=1] - E[Y_0|T=0]
+$$
+
+"""
+
+if SHOW_CODE:
+    st.code(
+        body="""
+        def bias(causal_data):
+            '''
+            Bias:
+                B = E[Y0|T=1] - E[Y0|T=0]
+            '''
+
+            T0 = causal_data["T"] == 0          # T=0
+            T1 = causal_data["T"] == 1          # T=1
+
+            Y0_T1 = causal_data[T1]["Y0"]       # Y0|T=1
+            Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
+
+            return Y0_T1.mean() - Y0_T0.mean()  # E[Y0|T=1] - E[Y0|T=0]
+            
+        print(bias(causal_data))
+        200.0
+        """
+    )
+
+
+def bias(causal_data):
+    """
+    E[Y0|T=1] - E[Y0|T=0]
+    """
+    T0 = causal_data["T"] == 0
+    T1 = causal_data["T"] == 1
+
+    Y0_T1 = causal_data[T1]["Y0"]
+    Y0_T0 = causal_data[T0]["Y0"]
+    return Y0_T1.mean() - Y0_T0.mean()
+
+
+"""
+### Association (A)
 
 Association is the difference in expected outcomes between the treated and
 untreated condition.
@@ -306,66 +365,47 @@ def association(causal_data):
     return Y1_T1.mean() - Y0_T0.mean()
 
 
-# st.write(association(causal_data))
+"""### When Association is Causation
 
+It turns out that Association can be broken down into two terms, nameley the
+Bias $B$ and the Average Treatment Effect on the Treatment, $ATT$.
 
 """
-#### Bias
 
-In the real world individuals vary on countless dimensions, not just the
-dimensions that we decide to intervene on. These additional dimensions can vary
-in conjunction with the treatment. We can think of **Bias** as capturing the
-inherent differences in the control and variation groups that cannot be accounted
-for directly by the treatment.
+st.markdown(
+    """
+    $$
+    A = ATT + B
+    $$
+    """
+)
 
-We can formally define bias as the difference in the average outcome between the
-control group ($T=0$) and variation group ($T=1)$ in the (counterfactual) world
-where neither group receives the treatment.
-"""
-
-st.latex("E[Y_0|T=1] - E[Y_0|T=0]")
-
-
-if SHOW_CODE:
-    st.code(
-        body="""
-        def bias(causal_data):
-            '''
-            Bias:
-                B = E[Y0|T=1] - E[Y0|T=0]
-            '''
-
-            T0 = causal_data["T"] == 0          # T=0
-            T1 = causal_data["T"] == 1          # T=1
-
-            Y0_T1 = causal_data[T1]["Y0"]       # Y0|T=1
-            Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
-
-            return Y0_T1.mean() - Y0_T0.mean()  # E[Y0|T=1] - E[Y0|T=0]
-            
-        print(bias(causal_data))
-        200.0
+show_proof = st.toggle("Show proof", value=False)
+if show_proof:
+    st.markdown(
         """
+    $$
+    \\begin{align*}
+    A &= E[Y|T=1] - E[Y|T=0] \\\\
+    &= E[Y_1|T=1] - E[Y_0|T=0] & \\text{only values we can observe} \\\\
+    \\end{align*}
+    $$
+    Because we can only observe...
+
+    $$
+    \\begin{align*}
+    &= E[Y_1|T=1] - E[Y_0|T=0] + (E[Y_0|T=1] - E[Y_0|T=1]) & \\pm \\text{ counterfactual} \\\\
+    &= E[Y_1|T=1] - E[Y_0|T=1] + E[Y_0|T=1] - E[Y_0|T=0] & \\text{...rearranging terms} \\\\
+    &= \\underbrace{E[Y_1 - Y_0|T=1]}_\\text{ATT}+ \\underbrace{E[Y_0|T=1] - E[Y_0|T=0])}_\\text{BIAS} & \\text{...which gives us two components} \\\\
+    \\end{align*}
+    $$
+"""
     )
 
 
-def bias(causal_data):
-    """
-    E[Y0|T=1] - E[Y0|T=0]
-    """
-    T0 = causal_data["T"] == 0
-    T1 = causal_data["T"] == 1
-
-    Y0_T1 = causal_data[T1]["Y0"]
-    Y0_T0 = causal_data[T0]["Y0"]
-    return Y0_T1.mean() - Y0_T0.mean()
-
-
-"""### When Association is Causation"""
-
 # Run the actual assertion
 assert np.isclose(
-    association(causal_data), TET(causal_data).mean() + bias(causal_data), atol=0.01
+    association(causal_data), ATT(causal_data).mean() + bias(causal_data), atol=0.01
 )
 
 if SHOW_CODE:
@@ -373,8 +413,7 @@ if SHOW_CODE:
     st.code(
         """
     assert np.isclose(
-        association(causal_data),
-        TET(causal_data).mean() + bias(causal_data),
+        association(causal_data), ATT(causal_data) + bias(causal_data),
         atol=0.01
     )
     """
@@ -382,7 +421,7 @@ if SHOW_CODE:
 
 
 """
-#### The interaction between Bias, Treatment Effect, and observed Association 
+## Interactive Demo
 """
 
 
@@ -426,14 +465,14 @@ lparam_col, rparam_col = st.columns([0.5, 0.5])
 
 with lparam_col:
     outcome_confounding = st.slider(
-        label="Outcome Confounding", min_value=0.0, max_value=3.0, value=0.0, step=0.1
+        label="Outcome Confounding", min_value=-0.0, max_value=3.0, value=0.0, step=0.1
     )
 
     ate = st.slider(
         label="Treatment Effect",
         min_value=0.0,
         max_value=2.0,
-        value=1.0,
+        value=0.0,
         step=0.01,
     )
 
@@ -448,7 +487,7 @@ with rparam_col:
 
     outcome_variance = st.slider(
         label="Outcome Variance",
-        min_value=0.2,
+        min_value=0.0,
         max_value=1.0,
         value=0.5,
         step=0.01,
@@ -491,7 +530,7 @@ def plot_observed(causal_data, n_show=N_SHOW):
     plt.xlabel("$X$")
     plt.ylabel("$Y$")
     plt.legend(loc="lower right")
-    plt.title(f"ASSOCIATION\n$E[Y|T=1] - E[Y|T=0]$ = {ASSOCIATION:0.3}")
+    plt.title(f"ASSOCIATION, $A$\n$E[Y|T=1] - E[Y|T=0]$ = {ASSOCIATION:0.3}")
     return ASSOCIATION
 
 
@@ -567,7 +606,7 @@ def plot_bias(causal_data, n_show=N_SHOW):
     plt.grid()
     plt.legend(loc="lower right")
 
-    plt.title(f"BIAS\n$E[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
+    plt.title(f"BIAS, $B$\n$E[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
     return BIAS
 
 
@@ -601,7 +640,7 @@ assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
 
 
 """
-# Review
+## Review
 - Causality is defined using potential outcomes, not realized (observed) outcomesff
 - Observed association is neither necessary nor sufficient to establish causation
 - Estimating causal effect of a treatment generally requires understanding the assignment mechanism
