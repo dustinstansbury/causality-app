@@ -9,13 +9,70 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 
+SHOW_ALL_CODE = st.checkbox("Show all code cells", value=True)
+
 
 """
 # Definitions & Notation
 
-## 🪄 Potential Outcomes
 
-### On Wizardry
+## Treatments & Observed Outcomes
+
+$
+T_i = \\begin{cases}
+        1, & \\text{if individual } i \\text{ received the treatment} \\\\
+        0, & \\text{otherwise}
+    \\end{cases}
+$
+
+$Y_i$ is the observed outcome for the individual $i$
+
+"""
+
+# Initialize a demo causal dataset, individuals indexed by `i`
+causal_data = pd.DataFrame()
+causal_data = pd.DataFrame(index=(1, 2, 3, 4))
+causal_data.index.name = "i"
+
+# Assign Treatments
+treatment = (0, 0, 1, 1)
+causal_data["T"] = treatment
+
+# Observed Outcomes
+observed_outcomes = (500, 600, 850, 750)
+causal_data["Y"] = observed_outcomes
+
+st.dataframe(causal_data.head())
+
+show_oo_code = st.checkbox(
+    "Show **Treatments** and **Observed Outcomes** as code", value=SHOW_ALL_CODE
+)
+if show_oo_code:
+    st.code(
+        """
+    import pandas as pd
+    import numpy as np
+            
+    # Initialize a demo dataset, individuals indexed by `i`
+    causal_data = pd.DataFrame(index=(1, 2, 3, 4))
+    causal_data.index.name = "i"
+
+    # Assign Treatments
+    treatment = (0, 0, 1, 1)
+    causal_data["T"] = treatment
+
+    # Observed Outcomes
+    observed_outcomes = (500, 600, 850, 750)
+    causal_data["Y"] = observed_outcomes
+
+    causal_data.head()
+    """
+    )
+
+"""
+## Potential Outcomes & The Fundamental Problem of Causal Inference 🪄
+
+### Potential Outcomes
 
 
 - $Y_{0i}$ is the potential outcome for unit $i$ in the absence of the treatment. If we were to observe that the unit did not receive the treatment, this is a **factual potential outcome**
@@ -24,125 +81,162 @@ import seaborn as sns
 
 """
 
-show_pe_code = st.checkbox("Show `potential_outcomes` as code")
-if show_pe_code:
-    st.code(
-        body="""
-        import pandas as pd
-        import numpy as np
-        
-        # Initialize a demo dataset, individuals indexed by `i`
-        causal_data = pd.DataFrame()
-        causal_data.index.name = "i"
-
-        # Assign potential outcomes for 4 individuals
-        causal_data["Y0"] = (500, 600, 700, 800)
-        causal_data["Y1"] = (450, 650, 850, 750)
-        """
-    )
-
-# Initialize a demo dataset, individuals indexed by `i`
-causal_data = pd.DataFrame()
-causal_data.index.name = "i"
-
 # Assign potential outcomes for 4 individuals
 causal_data["Y0"] = (500, 600, 700, 800)
 causal_data["Y1"] = (450, 650, 850, 750)
 
-st.dataframe(causal_data)
 
-"""### Treatment (T) & Observed outcomes (Y)"""
-st.code(
+def highlight_potential_outcomes(data):
     """
-treatment = np.array((0, 0, 1, 1))
-causal_data["T"] = treatment
+    Highlight the counterfactual cells
+    """
 
-# Observed outcomes
-causal_data["Y"] = causal_data.apply(
-    lambda x: x["Y1"] if x["T"] == 1 else x["Y0"], axis=1
-)
-causal_data.head()
+    # Empty DF with no styling
+    df_styled = pd.DataFrame("", index=data.index, columns=data.columns)
+
+    for T in (0, 1):
+        factual_mask = (data["T"] == T) & (data["Y"] == data[f"Y{T}"])
+        counterfactual_mask = (data["T"] != T) & (data["Y"] != data[f"Y{T}"])
+        if T == 1:
+            factual_format = "background-color: rgba(0, 128, 50, 0.85);"
+            counterfactual_format = "background-color: rgba(0, 128, 50, 0.35);"
+        else:
+            factual_format = "background-color: rgba(0, 100, 256, 0.85);"
+            counterfactual_format = "background-color: rgba(0, 100, 256, 0.35);"
+
+        df_styled.loc[factual_mask, f"Y{T}"] = factual_format
+        df_styled.loc[counterfactual_mask, f"Y{T}"] = counterfactual_format
+
+    return df_styled
+
+
+st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
+
+
+show_po_code = st.checkbox("Show **Potential_outcomes** as code", value=SHOW_ALL_CODE)
+if show_po_code:
+    st.code(
+        body="""
+
+        # Assign potential outcomes for 4 the individuals
+        causal_data["Y0"] = (500, 600, 700, 800)
+        causal_data["Y1"] = (450, 650, 850, 750)
+        causal_data.head()
+        """
+    )
+
+
+"""### Individual Treatment Effect"""
+
+st.markdown(
+    """
+$$
+{TE}_i = Y_{1i} - Y_{0i}
+$$
+
+${TE}_1$ = :green[450] - :blue[500] = -50
+
+${TE}_2$ = :green[650] - :blue[600] = 50
+
+${TE}_3$ = :green[850] - :blue[700] = 150
+
+${TE}_4$ = :green[750] - :blue[800] = -50
 """
 )
 
-treatment = np.array((0, 0, 1, 1))
-causal_data["T"] = treatment
 
-# Observed outcomes
-causal_data["Y"] = causal_data.apply(
-    lambda x: x["Y1"] if x["T"] == 1 else x["Y0"], axis=1
-)
-st.dataframe(causal_data)
-
-
-"""### Treatment Effect (TE)"""
-
-st.latex("TE = Y_1 - Y_0")
-
-# show_te_code = st.checkbox("Show `treatement_effect` as code")
-# if show_te_code:
-st.code(
-    body="""
-    def treatment_effect(causal_data):
-        '''Y1 - Y0'''
-
-        Y1 = causal_data["Y1"]
-        Y0 = causal_data["Y0"]
-        return Y1 - Y0
+def TE(causal_data):
     """
-)
-
-
-st.code(
+    Treatment Effect, TE:
+        TE = Y1 - Y0
     """
-    causal_data["TE"] = treatment_effect(causal_data)
-    causal_data.head()
-"""
-)
-
-
-def treatment_effect(causal_data):
-    """Y1 - Y0"""
     Y1 = causal_data["Y1"]
     Y0 = causal_data["Y0"]
     return Y1 - Y0
 
 
-causal_data["TE"] = treatment_effect(causal_data)
-st.dataframe(causal_data)
+causal_data["TE"] = TE(causal_data)
 
-"""### Treatment Effect on Treated (TET)"""
-
-st.latex("TET = Y_1 - Y_0|T = 1")
+st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
+# st.dataframe(causal_data)
 
 
-def treatement_effect_on_treated(causal_data):
-    """TET = (Y1 - Y0)|T=1"""
+show_te_code = st.checkbox("Show **Treatement Effect** as code", value=SHOW_ALL_CODE)
+if show_te_code:
+    st.code(
+        body="""
+        def TE(causal_data):
+            '''
+            Treatment Effect, TE
+                TE = Y1 - Y0
+            '''
+            Y1 = causal_data["Y1"]
+            Y0 = causal_data["Y0"]
+            return Y1 - Y0
+
+        causal_data["TE"] = TE(causal_data)
+        causal_data.head()
+        """
+    )
+
+"""
+### Treatment Effect on Treated (TET)
+
+$$
+TET = Y_1 - Y_0|T = 1
+$$
+"""
+
+
+def TET(causal_data):
+    """
+    Treatment Effect on Treated, TET:
+        TET = (Y1 - Y0) | T=1
+    """
     T1 = causal_data["T"] == 1
     Y1_T1 = causal_data[T1]["Y1"]
     Y0_T1 = causal_data[T1]["Y0"]
     return Y1_T1 - Y0_T1
 
 
-# show_tet_code = st.checkbox("Show `treatement_effect_on_treated` as code")
-# if show_tet_code:
-st.code(
-    body="""
-    def treatement_effect_on_treated(causal_data):
-        '''TET = (Y1 - Y0)|T=1'''
+causal_data["TET"] = TET(causal_data)
+# st.dataframe(causal_data)
+st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
 
-        T1 = causal_data["T"] == 1     # T=1
-        Y1_T1 = causal_data[T1]["Y1"]  # Y1|T=1
-        Y0_T1 = causal_data[T1]["Y0"]  # Y0|T=1
-        return Y1_T1 - Y0_T1           # (Y1 - Y0)|T=1
-    
-    causal_data["TET"] = treatement_effect_on_treated(causal_data)
-    causal_data.head()
-    """
+show_tet_code = st.checkbox(
+    "Show **Treatment Effect on Treated** as code", value=SHOW_ALL_CODE
 )
+if show_tet_code:
+    st.code(
+        body="""
+        def TET(causal_data):
+            '''
+            Treatment Effect on Treated, TET:
+                TET = (Y1 - Y0)|T=1
+            '''
 
-causal_data["TET"] = treatement_effect_on_treated(causal_data)
-st.dataframe(causal_data)
+            T1 = causal_data["T"] == 1     # T=1
+            Y1_T1 = causal_data[T1]["Y1"]  # Y1|T=1
+            Y0_T1 = causal_data[T1]["Y0"]  # Y0|T=1
+            return Y1_T1 - Y0_T1           # (Y1 - Y0)|T=1
+        
+        causal_data["TET"] = TET(causal_data)
+        causal_data.head()
+        """
+    )
+
+
+"""### Average Treatment Effect
+
+#### WIP
+
+
+### Average Treatment Effect on the Treated
+
+#### WIP
+
+"""
+
 
 """### Association, Bias, & Causation"""
 
@@ -163,24 +257,29 @@ st.latex(
 )
 
 
-# show_assoc_code = st.checkbox("Show `association` as code")
-# if show_assoc_code:
-st.code(
-    body="""
-    def association(causal_data):
-        '''E[Y|T=1] - E[Y|T=0] = E[Y1|T=1] - E[Y0|T=0]'''
+show_assoc_code = st.checkbox("Show **Association** as code", value=SHOW_ALL_CODE)
+if show_assoc_code:
+    st.code(
+        body="""
+        def association(causal_data):
+            '''
+            Association, A:
+                A = E[Y|T=1] - E[Y|T=0] 
+                  = E[Y1|T=1] - E[Y0|T=0]
+            '''
 
-        T0 = causal_data["T"] == 0          # T=0
-        T1 = causal_data["T"] == 1          # T=1
+            T0 = causal_data["T"] == 0          # T=0
+            T1 = causal_data["T"] == 1          # T=1
 
-        Y1_T1 = causal_data[T1]["Y1"]       # Y1|T=1
-        Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
+            Y1_T1 = causal_data[T1]["Y1"]       # Y1|T=1
+            Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
 
-        return Y1_T1.mean() - Y0_T0.mean()  # E[Y1|T=1] - E[Y0|T=0]
+            return Y1_T1.mean() - Y0_T0.mean()  # E[Y1|T=1] - E[Y0|T=0]
 
-    print(association(causal_data))
-    """
-)
+        print(association(causal_data))
+        """
+        "250"
+    )
 
 
 def association(causal_data):
@@ -194,7 +293,7 @@ def association(causal_data):
     return Y1_T1.mean() - Y0_T0.mean()
 
 
-st.write(association(causal_data))
+# st.write(association(causal_data))
 
 
 """
@@ -214,24 +313,28 @@ where neither group receives the treatment.
 st.latex("E[Y_0|T=1] - E[Y_0|T=0]")
 
 
-# show_bias_code = st.checkbox("Show `bias` as code")
-# if show_bias_code:
-st.code(
-    body="""
-    def bias(causal_data):
-        '''E[Y0|T=1] - E[Y0|T=0]'''
+show_bias_code = st.checkbox("Show **Bias** as code", value=SHOW_ALL_CODE)
+if show_bias_code:
+    st.code(
+        body="""
+        def bias(causal_data):
+            '''
+            Bias:
+                B = E[Y0|T=1] - E[Y0|T=0]
+            '''
 
-        T0 = causal_data["T"] == 0          # T=0
-        T1 = causal_data["T"] == 1          # T=1
+            T0 = causal_data["T"] == 0          # T=0
+            T1 = causal_data["T"] == 1          # T=1
 
-        Y0_T1 = causal_data[T1]["Y0"]       # Y0|T=1
-        Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
+            Y0_T1 = causal_data[T1]["Y0"]       # Y0|T=1
+            Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
 
-        return Y0_T1.mean() - Y0_T0.mean()  # E[Y0|T=1] - E[Y0|T=0]
-        
-    print(bias(causal_data))
-    """
-)
+            return Y0_T1.mean() - Y0_T0.mean()  # E[Y0|T=1] - E[Y0|T=0]
+            
+        print(bias(causal_data))
+        200.0
+        """
+    )
 
 
 def bias(causal_data):
@@ -246,14 +349,31 @@ def bias(causal_data):
     return Y0_T1.mean() - Y0_T0.mean()
 
 
-st.write(bias(causal_data))
+"""## Association vs Causation"""
 
+# Run the actual assertion
+assert np.isclose(
+    association(causal_data), TET(causal_data).mean() + bias(causal_data), atol=0.01
+)
 
-"""## When is Association is the same as Causation?"""
+show_assoc_assert_code = st.checkbox(
+    "Demonstrate the Association relationship in code", value=SHOW_ALL_CODE
+)
+if show_assoc_assert_code:
+
+    st.code(
+        """
+    assert np.isclose(
+        association(causal_data),
+        TET(causal_data).mean() + bias(causal_data),
+        atol=0.01
+    )
+    """
+    )
 
 
 """
-#### Interactive Demo
+### Demonstrating the interaction between Bias, Treatment Effect, and observed Association 
 """
 
 
@@ -398,7 +518,7 @@ def plot_counterfactuals(causal_data, n_show=N_SHOW):
                 label=label,
             )
 
-    ATT = treatement_effect_on_treated(causal_data).mean()
+    ATT = TET(causal_data).mean()
 
     plt.xlim((-DATA_RANGE, DATA_RANGE))
     plt.ylim((-DATA_RANGE, DATA_RANGE))
@@ -442,6 +562,7 @@ def plot_bias(causal_data, n_show=N_SHOW):
     return BIAS
 
 
+# Run simulation
 causal_data = generate_causal_data(
     n_points=10000,
     beta_confound=outcome_confounding,
@@ -451,7 +572,6 @@ causal_data = generate_causal_data(
     random_seed=12,
 )
 
-# fig, axs = plt.subplots(3, 1, figsize=(5, 18))
 fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 
 plt.sca(axs[0])
@@ -463,21 +583,12 @@ ATT = plot_counterfactuals(causal_data)
 plt.sca(axs[2])
 ASSOCIATION = plot_observed(causal_data)
 
-
 plt.margins(tight=True)
 
 st.pyplot(fig)
 
+# Assert Association relationship holds for all simulations
 assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
-
-st.code(
-    """
-assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
-"""
-)
-
-
-"""## The Fundamental Problem of Causal Inference"""
 
 
 """
