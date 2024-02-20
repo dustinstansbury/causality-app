@@ -32,7 +32,8 @@ c. [When Association is Causation](#when-association-is-causation) \\
 
 
 """
-## Potential Outcomes & the Fundamental Problem of Causal Inference
+# Potential Outcomes & the Fundamental Problem of Causal Inference
+---
 
 ### Treatments and Observed Outcomes
 
@@ -379,7 +380,9 @@ st.markdown(
     """
 )
 
-show_proof = st.toggle("Show the derivation", value=False)
+
+show_proof = st.toggle("💡 Show the derivation", value=False)
+
 if show_proof:
     st.markdown(
         """
