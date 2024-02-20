@@ -2,22 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
-
-from streamlit.components.v1 import html
-
-from matplotlib import pyplot as plt
-from scipy import stats
 import seaborn as sns
 
 
-SHOW_CODE = st.sidebar.toggle("Show/hide Python Code", value=True)
+from scipy.stats import bernoulli
+from navigation import make_sidebar, make_footer
+
+
+make_sidebar()
+
+SHOW_CODE = st.sidebar.toggle("Hide/Show Python Code", value=True)
 
 
 # TODO: Making these TOCs by hand does not scale well
 st.sidebar.markdown(
     """
-
-[Treatments and Observed Outcomes](#treatments-and-observed-outcomes) \\
+[Treatments and Observed Outcomes](#potential-outcomes) \\
 [Potential Outcomes](#potential-outcomes) \\
 [Individual Treatment Effect](#individual-treatment-effect-te) \\
 [Treatment Effect on the Treated](#treatment-effect-on-treated-tet) \\
@@ -27,7 +27,6 @@ st.sidebar.markdown(
 a. [Bias](#bias-b) \\
 b. [Association](#association-a) \\
 c. [When Association is Causation](#when-association-is-causation) \\
-[Ineractive Demo](#interactive-demo)
 """
 )
 
@@ -380,7 +379,7 @@ st.markdown(
     """
 )
 
-show_proof = st.toggle("Show proof", value=False)
+show_proof = st.toggle("Show the derivation", value=False)
 if show_proof:
     st.markdown(
         """
@@ -448,7 +447,7 @@ def generate_causal_data(
 
     np.random.seed(random_seed)
     p_treatment = logistic(log_odds)
-    T = stats.bernoulli.rvs(p=p_treatment)
+    T = bernoulli.rvs(p=p_treatment)
 
     # Random indvidual treatment effects distributed around ATE
     TE = ate + np.random.randn(n_points) * ate / 5
@@ -646,8 +645,4 @@ assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
 - Estimating causal effect of a treatment generally requires understanding the assignment mechanism
 """
 
-# bmc_button = """
-# <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="dustinstansbury" data-color="#FFDD00" data-emoji=""  data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff" ></script>
-# """
-
-# html(bmc_button, height=70, width=220)
+make_footer()
