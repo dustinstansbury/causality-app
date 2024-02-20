@@ -1,3 +1,3 @@
 # Global config
 
-SHOW_BUY_ME_A_BEER = True
+SHOW_BUY_ME_A_BEER = False
