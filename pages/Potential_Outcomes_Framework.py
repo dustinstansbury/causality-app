@@ -791,8 +791,14 @@ change_link_color = """
         background-color: transparent;
         text-decoration: none;
     }
+    a:hover{
+        color:red;
+        background-color: transparent;
+        text-decoration: none;
+    }
+    
     a:link {
-        color: red;
+        color: None;
         background-color: transparent;
         text-decoration: none;
 }
