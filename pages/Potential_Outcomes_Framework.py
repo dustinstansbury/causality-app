@@ -9,6 +9,67 @@ from scipy.stats import bernoulli
 from navigation import make_sidebar, make_footer
 
 
+def highlight_treatments(data):
+    """
+    Highlight the treatment cells. Note that this is not shown in the
+    code blocks.
+    """
+
+    # Empty DF with no styling
+    df_styled = pd.DataFrame("", index=data.index, columns=data.columns)
+
+    treated_mask = data["T"] == 1
+    untreated_mask = data["T"] == 0
+    treated_format = "color: green;"
+    untreated_format = "color: blue;"
+
+    df_styled.loc[treated_mask, "T"] = treated_format
+    df_styled.loc[untreated_mask, "T"] = untreated_format
+
+    return df_styled
+
+
+def highlight_potential_outcomes(data):
+    """
+    Highlight the counterfactual cells. Note that this is not shown in the
+    code blocks.
+    """
+
+    # Empty DF with no styling
+    df_styled = pd.DataFrame("", index=data.index, columns=data.columns)
+
+    for T in (0, 1):
+        factual_mask = (data["T"] == T) & (data["Y"] == data[f"Y{T}"])
+        counterfactual_mask = (data["T"] != T) & (data["Y"] != data[f"Y{T}"])
+        if T == 1:
+            factual_format = "background-color: rgba(0, 128, 50, 0.85);"
+            counterfactual_format = "background-color: rgba(0, 128, 50, 0.25);"
+        else:
+            factual_format = "background-color: rgba(0, 100, 256, 0.85);"
+            counterfactual_format = "background-color: rgba(0, 100, 256, 0.25);"
+
+        df_styled.loc[factual_mask, f"Y{T}"] = factual_format
+        df_styled.loc[counterfactual_mask, f"Y{T}"] = counterfactual_format
+
+    return df_styled
+
+
+def format_causal_data(causal_data, formatters):
+    styled_df = causal_data.style.apply(formatters[0], axis=None)
+    if len(formatters) > 1:
+        for formatter in formatters[1:]:
+            styled_df = styled_df.apply(formatter, axis=None)
+
+    return styled_df.format(precision=0)
+
+
+def display_causal_data(causal_data, formatters):
+    formatters = [formatters] if not isinstance(formatters, list) else formatters
+    st.dataframe(format_causal_data(causal_data, formatters))
+
+
+FORMATTERS = [highlight_treatments]
+
 make_sidebar()
 
 SHOW_CODE = st.sidebar.toggle("Hide/Show Python Code", value=True)
@@ -17,7 +78,7 @@ SHOW_CODE = st.sidebar.toggle("Hide/Show Python Code", value=True)
 # TODO: Making these TOCs by hand does not scale well
 st.sidebar.markdown(
     """
-[Treatments and Observed Outcomes](#potential-outcomes) \\
+[Observed Outcomes and Treatments](#observed-outcomes-and-treatments) \\
 [Potential Outcomes](#potential-outcomes) \\
 [Individual Treatment Effect](#individual-treatment-effect-te) \\
 [Treatment Effect on the Treated](#treatment-effect-on-treated-tet) \\
@@ -26,16 +87,20 @@ st.sidebar.markdown(
 [Causation vs Association](#causation-vs-association) \\
 a. [Bias](#bias-b) \\
 b. [Association](#association-a) \\
-c. [When Association is Causation](#when-association-is-causation) \\
+c. [When Association is Causation](#when-association-is-causation)
 """
 )
 
 
 """
-# Potential Outcomes & the Fundamental Problem of Causal Inference
+# The Potential Outcomes Framework & the Fundamental Problem of Causal Inference
 ---
 
-### Treatments and Observed Outcomes
+### Observed Outcomes and Treatments
+
+$Y_i$ is the **Observed Outcome** for the individual $i$. $T_i$ is the **treatment**
+for the same individual. When the treatement variable is binary--i.e. the individual
+can either receive the treatment or not--then it is defined as follows:
 
 $
 T_i = \\begin{cases}
@@ -43,8 +108,6 @@ T_i = \\begin{cases}
         0, & \\text{otherwise}
     \\end{cases}
 $
-
-$Y_i$ is the observed outcome for the individual $i$
 
 """
 
@@ -54,18 +117,18 @@ if SHOW_CODE:
         """
     import pandas as pd
     import numpy as np
-            
-    # Initialize a demo dataset, individuals indexed by `i`
+
+    # Initialize a dataset for four individuals, each indexed by `i`
     causal_data = pd.DataFrame(index=(1, 2, 3, 4))
     causal_data.index.name = "i"
 
-    # Assign Treatments
-    treatment = (0, 0, 1, 1)
-    causal_data["T"] = treatment
-
-    # Observed Outcomes
+    # Observed outcomes for each individual
     observed_outcomes = (500, 600, 850, 750)
     causal_data["Y"] = observed_outcomes
+
+    # Assigned Treatment for each individual
+    treatment = (0, 0, 1, 1)
+    causal_data["T"] = treatment
 
     causal_data.head()
     """
@@ -76,26 +139,51 @@ causal_data = pd.DataFrame()
 causal_data = pd.DataFrame(index=(1, 2, 3, 4))
 causal_data.index.name = "i"
 
-# Assign Treatments
-treatment = (0, 0, 1, 1)
-causal_data["T"] = treatment
-
 # Observed Outcomes
 observed_outcomes = (500, 600, 850, 750)
 causal_data["Y"] = observed_outcomes
 
-st.dataframe(causal_data.head())
+# Assigned Treatments
+treatment = (0, 0, 1, 1)
+causal_data["T"] = treatment
 
+
+display_causal_data(causal_data, FORMATTERS)
 
 """
-
 ### Potential Outcomes
 
+**MOTIVATION FOR POTENTIAL OUTCOMES AS A DEVICE TO THINK ABOUT CAUSALITY**
 
-- $Y_{0i}$ is the potential outcome for unit $i$ in the absence of the treatment. If we were to observe that the unit did not receive the treatment, this is a **factual potential outcome**
-- $Y_{1i}$ is the potential outcome for the same unit in the precsence of the treatment. When we observe that the unit did not receive the treatment, this is a **counterfactual potential outcome**
+In the case of binary treatments, **Potential Outcomes** capture the state of an
+individual $i$ that results from being in the presence of the treatment $T_i=1$
+or the absence of the treatment $T_i=0$. One can think of the potential outcomes
+as an inherent trait associated with each individual, akin to one's height or eye color,
+and capture both the state of the real world, as well as the state of an alternative
+universe.
 
+Potential outcomes fall into one of two groups:
 
+- **Factual** potential outcomes are those that are truly observed. They are what
+are actualized in data that we record.
+- **Counterfactual** potential outcomes on the
+other hand are unrealized states that _would have happened_ in an alternative
+world where the individual received the alternative treatment condition.
+
+Formally define the potential outcomes as follows:
+
+$Y_{1i}$ is the potential outcome of individual $i$ in the **presence of the treatment**.
+  - If we _observe_ that the individual _did in fact_ receive the treatment, i.e. $Y_{1i} | T_i=1$, then we refer to $Y_{1i}$ as a **factual** potential outcome.
+  - However, if _it were possible to observe_ that the individual _did not receive_ the treatment, i.e. $Y_{1i} | T_i=0$, then we refer to $Y_{1i}$ as a **counterfactual** potential outcome.
+
+In a similar fashion, $Y_{0i}$ is the potential outcome for the same individual in the **absence of the treatment**.
+  - _If it were possible to observe_ that the individual received the treatment, i.e. $Y_{0i} | T_i=1$, then we refer to $Y_{0i}$ as a **counterfactual** potential outcome.
+  - However, if we _observe_ that the individual _did in fact not receive_ the treatment, i.e. $Y_{0i} | T_i=0$, then we refer to $Y_{0i}$ as a **factual** potential outcome.
+
+In other words, factual potential outcomes occur when the state of the potential
+outcome aligns with the observed treatment condition--i.e. $Y_0 | T=0$ or $Y_1 | T=1$,
+while conterfactual potential outcomes are fictitiuos situations where the potential
+outcome is counter to the observed treatment condition--i.e. $Y_0 | T=1$ or $Y_1 | T=0$.
 """
 
 if SHOW_CODE:
@@ -113,33 +201,8 @@ if SHOW_CODE:
 causal_data["Y0"] = (500, 600, 700, 800)
 causal_data["Y1"] = (450, 650, 850, 750)
 
-
-def highlight_potential_outcomes(data):
-    """
-    Highlight the counterfactual cells. Note that this is not shown in the
-    code blocks.
-    """
-
-    # Empty DF with no styling
-    df_styled = pd.DataFrame("", index=data.index, columns=data.columns)
-
-    for T in (0, 1):
-        factual_mask = (data["T"] == T) & (data["Y"] == data[f"Y{T}"])
-        counterfactual_mask = (data["T"] != T) & (data["Y"] != data[f"Y{T}"])
-        if T == 1:
-            factual_format = "background-color: rgba(0, 128, 50, 0.85);"
-            counterfactual_format = "background-color: rgba(0, 128, 50, 0.35);"
-        else:
-            factual_format = "background-color: rgba(0, 100, 256, 0.85);"
-            counterfactual_format = "background-color: rgba(0, 100, 256, 0.35);"
-
-        df_styled.loc[factual_mask, f"Y{T}"] = factual_format
-        df_styled.loc[counterfactual_mask, f"Y{T}"] = counterfactual_format
-
-    return df_styled
-
-
-st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
+FORMATTERS.append(highlight_potential_outcomes)
+display_causal_data(causal_data, FORMATTERS)
 
 
 """### Individual Treatment Effect (TE)"""
@@ -190,14 +253,47 @@ def TE(causal_data):
 
 causal_data["TE"] = TE(causal_data)
 
-st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
-# st.dataframe(causal_data)
+display_causal_data(causal_data, FORMATTERS)
 
 """
 ### Average Treatment Effect (ATE)
 
-#### WIP
+$$
+\\begin{align*}
+ATE &= \\frac{1}{N} \sum_i^N {TE}_{i} \\\\
+    &= E[Y_1 - Y_0]
+\\end{align*}
+$$
+
+In the example above, the $ATE$ would be calculated as
+$$
+ATE = \\frac{(-50) + 50 + 150 + (-50)}{4} = 25
+$$
 """
+
+if SHOW_CODE:
+    st.code(
+        body="""
+        def ATE(causal_data):
+            '''
+            Average Treatment Effect, ATE
+                ATE = E[Y1 - Y0]
+            '''
+            return TE(causal_data).mean()
+
+        print(ATE(causal_data))
+        # 25.0
+        """
+    )
+
+
+def ATE(causal_data):
+    """
+    Average Treatment Effect, ATE
+        ATE = E[Y1 - Y0]
+    """
+    return TE(causal_data).mean()
+
 
 """
 ### Treatment Effect on Treated (TET)
@@ -239,20 +335,42 @@ def TET(causal_data):
 
 
 causal_data["TET"] = TET(causal_data)
-# st.dataframe(causal_data)
-st.dataframe(causal_data.style.apply(highlight_potential_outcomes, axis=None))
+
+display_causal_data(causal_data, FORMATTERS)
 
 
 """
 
 ### Average Treatment Effect on the Treated (ATT)
 
-#### WIP
+In the example above, the $ATT$ would be calculated as
+$$
+ATT = \\frac{150 + (-50)}{2} = 50
+$$
 
 """
 
+if SHOW_CODE:
+    st.code(
+        body="""
+        def ATT(causal_data):
+            '''
+            Average Treatment Effect on Treated, ATT
+                ATT = E[Y1 - Y0|T=1]
+            '''
+            return TET(causal_data).mean()
+
+        print(ATT(causal_data))
+        # 50
+        """
+    )
+
 
 def ATT(causal_data):
+    """
+    Average Treatment Effect on Treated, ATT
+        ATE = E[Y1 - Y0 | T=1]
+    """
     return TET(causal_data).mean()
 
 
@@ -295,7 +413,7 @@ if SHOW_CODE:
             Y0_T0 = causal_data[T0]["Y0"]       # Y0|T=0
 
             return Y0_T1.mean() - Y0_T0.mean()  # E[Y0|T=1] - E[Y0|T=0]
-            
+
         print(bias(causal_data))
         200.0
         """
@@ -386,19 +504,37 @@ show_proof = st.toggle("💡 Show the derivation", value=False)
 if show_proof:
     st.markdown(
         """
+    Starting with the formal definition of association in terms of potential
+    outcomes:
+
     $$
-    \\begin{align*}
-    A &= E[Y|T=1] - E[Y|T=0] \\\\
-    &= E[Y_1|T=1] - E[Y_0|T=0] & \\text{only values we can observe} \\\\
-    \\end{align*}
+    A = E[Y|T=1] - E[Y|T=0],
     $$
-    Because we can only observe...
+
+    we can substitute the potential outcomes with observed outcomes: For the treated,
+    the observed outcome is $Y_1$, thus $E[Y|T=1] = E[Y_1|T=1]$.
+    Similarly, for the untreated, the observed outcome is $Y_0$, thus $E[Y|T=0] = E[Y_0|T=0]$.
+    This gives us the Association in terms of observed outcomes.
+
+    $$
+    A = E[Y_1|T=1] - E[Y_0|T=0]
+    $$
+
+    We can now perform a little trick by adding and subtracting the following term to $A$:
+
+    $$
+    \\pm \; E[Y_0|T=1]
+    $$
+
+    This term is the _counterfactual outcome_ of _would have happened_ to the treated group,
+    had they not received the treatment.
 
     $$
     \\begin{align*}
-    &= E[Y_1|T=1] - E[Y_0|T=0] + (E[Y_0|T=1] - E[Y_0|T=1]) & \\pm \\text{ counterfactual} \\\\
-    &= E[Y_1|T=1] - E[Y_0|T=1] + E[Y_0|T=1] - E[Y_0|T=0] & \\text{...rearranging terms} \\\\
-    &= \\underbrace{E[Y_1 - Y_0|T=1]}_\\text{ATT}+ \\underbrace{E[Y_0|T=1] - E[Y_0|T=0])}_\\text{BIAS} & \\text{...which gives us two components} \\\\
+    A &= E[Y_1|T=1] - E[Y_0|T=0] \pm E[Y_0|T=1] & \\pm \\text{ counterfactual} \\\\
+    &= \color{blue}{E[Y_1|T=1]} \; \color{black}{-} \; \color{red}{E[Y_0|T=0]} \color{black} + \color{red}{E[Y_0|T=1]} \color{black}{-} \color{blue}{E[Y_0|T=1]} &  \\text{...grouping terms} \\\\
+    &= \color{blue}{E[Y_1|T=1] - E[Y_0|T=1]} \; \color{black}{+} \; \color{red}{E[Y_0|T=1] - E[Y_0|T=0]} & \\text{...rearranging terms} \\\\
+    &= \\color{blue}{\\underbrace{E[Y_1 - Y_0|T=1]}_\\text{ATT}} \; \color{black}{+} \; \color{red}{\\underbrace{E[Y_0|T=1] - E[Y_0|T=0])}_\\text{BIAS}} & \\text{...giving us two components} \\\\
     \\end{align*}
     $$
 """
@@ -647,5 +783,21 @@ assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
 - Observed association is neither necessary nor sufficient to establish causation
 - Estimating causal effect of a treatment generally requires understanding the assignment mechanism
 """
+
+change_link_color = """
+<style>
+    a:visited{
+        color:None;
+        background-color: transparent;
+        text-decoration: none;
+    }
+    a:link {
+        color: red;
+        background-color: transparent;
+        text-decoration: none;
+}
+</style>
+"""
+st.markdown(change_link_color, True)
 
 make_footer()
