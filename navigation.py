@@ -3,16 +3,35 @@ from streamlit.components.v1 import html
 from config import SHOW_BUY_ME_A_BEER
 
 
+change_link_color = """
+<style>
+    a:link {
+    color: green;
+    background-color: transparent;
+    text-decoration: none;
+}
+</style>
+"""
+
+
 def make_sidebar():
     """
-    Manually create sidebar (turned off in config.toml)
+    Manually create nav/TOC sidebar (default nav sidebar turned off in config.toml)
     """
     with st.sidebar:
-        st.title("Causal Inference Book")
+        st.markdown(change_link_color, unsafe_allow_html=True)
+        st.title("Causal Inference for Data Science")
 
         st.page_link("Main.py", label="Home", icon="🏠")
 
-        st.write("## Basics")
+        st.write("## Formalizing Causality")
+
+        st.page_link(
+            "pages/Motivation.py",
+            label="Motivation",
+            icon="💡",
+        )
+
         st.page_link(
             "pages/Potential_Outcomes_Framework.py",
             label="Potential Outcomes Framework",
