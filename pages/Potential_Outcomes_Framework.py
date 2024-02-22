@@ -6,7 +6,21 @@ import seaborn as sns
 
 
 from scipy.stats import bernoulli
-from navigation import make_sidebar, make_footer
+from navigation import make_sidebar, make_footer, make_toc
+
+
+DARK_GREEN = (9, 121, 105, 1.0)
+LIGHT_GREEN = (193, 225, 193, 1.0)
+DARK_BLUE = (65, 105, 225, 1.0)
+LIGHT_BLUE = (167, 199, 231, 1.0)
+
+MPL_RESCALE = np.array((1 / 256, 1 / 256, 1 / 256, 1))
+
+MPL_Y0_COLORS = [
+    np.array(DARK_BLUE) * MPL_RESCALE,
+    np.array(LIGHT_GREEN) * MPL_RESCALE,
+]
+MPL_Y1_COLORS = [np.array(LIGHT_BLUE) * MPL_RESCALE, np.array(DARK_GREEN) * MPL_RESCALE]
 
 
 def highlight_treatments(data):
@@ -20,8 +34,8 @@ def highlight_treatments(data):
 
     treated_mask = data["T"] == 1
     untreated_mask = data["T"] == 0
-    treated_format = "color: green;"
-    untreated_format = "color: blue;"
+    treated_format = f"color: rgba{DARK_GREEN};"
+    untreated_format = f"color: rgba{DARK_BLUE};"
 
     df_styled.loc[treated_mask, "T"] = treated_format
     df_styled.loc[untreated_mask, "T"] = untreated_format
@@ -40,13 +54,19 @@ def highlight_potential_outcomes(data):
 
     for T in (0, 1):
         factual_mask = (data["T"] == T) & (data["Y"] == data[f"Y{T}"])
-        counterfactual_mask = (data["T"] != T) & (data["Y"] != data[f"Y{T}"])
+        counterfactual_mask = (
+            (data["T"] != T)
+            & (data["Y"] != data[f"Y{T}"])
+            & data["Y0"].notnull()
+            & data["Y1"].notnull()
+        )
+
         if T == 1:
-            factual_format = "background-color: rgba(0, 128, 50, 0.85);"
-            counterfactual_format = "background-color: rgba(0, 128, 50, 0.25);"
+            factual_format = f"background-color: rgba{DARK_GREEN}; color: white"
+            counterfactual_format = f"background-color: rgba{LIGHT_GREEN};"
         else:
-            factual_format = "background-color: rgba(0, 100, 256, 0.85);"
-            counterfactual_format = "background-color: rgba(0, 100, 256, 0.25);"
+            factual_format = f"background-color: rgba{DARK_BLUE}; color: white"
+            counterfactual_format = f"background-color: rgba{LIGHT_BLUE};"
 
         df_styled.loc[factual_mask, f"Y{T}"] = factual_format
         df_styled.loc[counterfactual_mask, f"Y{T}"] = counterfactual_format
@@ -73,23 +93,6 @@ FORMATTERS = [highlight_treatments]
 make_sidebar()
 
 SHOW_CODE = st.sidebar.toggle("Hide/Show Python Code", value=True)
-
-
-# TODO: Making these TOCs by hand does not scale well
-st.sidebar.markdown(
-    """
-[Observed Outcomes and Treatments](#observed-outcomes-and-treatments) \\
-[Potential Outcomes](#potential-outcomes) \\
-[Individual Treatment Effect](#individual-treatment-effect-te) \\
-[Treatment Effect on the Treated](#treatment-effect-on-treated-tet) \\
-[Average Treatment Effect](#average-treatment-effect-ate) \\
-[Average Treatment Effect on the Treated](#average-treatment-effect-on-the-treated-att) \\
-[Causation vs Association](#causation-vs-association) \\
-a. [Bias](#bias-b) \\
-b. [Association](#association-a) \\
-c. [When Association is Causation](#when-association-is-causation)
-"""
-)
 
 
 """
@@ -377,6 +380,17 @@ def ATT(causal_data):
 """## Causation vs Association"""
 
 
+def convert_causal_data_to_observational(causal_data):
+    obs_data = causal_data.copy()
+    obs_data.loc[obs_data["T"] == 1, "Y0"] = None
+    obs_data.loc[obs_data["T"] == 0, "Y1"] = None
+    obs_data["TE"] = None
+    obs_data["TET"] = None
+    return obs_data
+
+
+display_causal_data(convert_causal_data_to_observational(causal_data), FORMATTERS)
+
 """
 ### Bias (B)
 
@@ -559,7 +573,7 @@ if SHOW_CODE:
 
 
 """
-## Interactive Demo
+## Demo
 """
 
 
@@ -632,8 +646,6 @@ with rparam_col:
     )
 
 
-Y0_COLORS = ["darkblue", "lightgreen"]
-Y1_COLORS = ["lightblue", "darkgreen"]
 MARKER_SIZE = 100
 N_SHOW = 25
 DATA_RANGE = 3.5
@@ -646,7 +658,7 @@ def plot_observed(causal_data, n_show=N_SHOW):
         treatment_data = causal_data[causal_data["T"] == T]
         treatment_means.append(treatment_data["Y"].mean())
 
-        color = Y1_COLORS[T] if (T == 1) else Y0_COLORS[T]
+        color = MPL_Y1_COLORS[T] if (T == 1) else MPL_Y0_COLORS[T]
         sns.scatterplot(
             treatment_data.iloc[:n_show],
             x="X",
@@ -658,7 +670,7 @@ def plot_observed(causal_data, n_show=N_SHOW):
         )
 
     for T in (0, 1):
-        color = Y1_COLORS[T] if T == 1 else Y0_COLORS[T]
+        color = MPL_Y1_COLORS[T] if T == 1 else MPL_Y0_COLORS[T]
         plt.axhline(treatment_means[T], color=color, label=f"$E[Y|T={T}]$")
 
     ASSOCIATION = association(causal_data)
@@ -668,7 +680,7 @@ def plot_observed(causal_data, n_show=N_SHOW):
     plt.xlabel("$X$")
     plt.ylabel("$Y$")
     plt.legend(loc="lower right")
-    plt.title(f"ASSOCIATION, $A$\n$E[Y|T=1] - E[Y|T=0]$ = {ASSOCIATION:0.3}")
+    plt.title(f"ASSOCIATION, $A$\n$E[Y|T=1] - E[Y|T=0]$ = {ASSOCIATION:0.1f}")
     return ASSOCIATION
 
 
@@ -679,7 +691,7 @@ def plot_counterfactuals(causal_data, n_show=N_SHOW):
             treatment_data,
             x="X",
             y="Y0",
-            color=Y0_COLORS[T],
+            color=MPL_Y0_COLORS[T],
             s=MARKER_SIZE,
             zorder=3,
             label=f"$Y_0|T={T}$",
@@ -688,7 +700,7 @@ def plot_counterfactuals(causal_data, n_show=N_SHOW):
             treatment_data,
             x="X",
             y="Y1",
-            color=Y1_COLORS[T],
+            color=MPL_Y1_COLORS[T],
             s=MARKER_SIZE,
             zorder=2,
             label=f"$Y_1|T={T}$",
@@ -700,7 +712,7 @@ def plot_counterfactuals(causal_data, n_show=N_SHOW):
                 (r.Y0, r.Y1),
                 color="k",
                 linewidth=0.5,
-                zorder=1,
+                zorder=-1,
                 label=label,
             )
 
@@ -712,7 +724,7 @@ def plot_counterfactuals(causal_data, n_show=N_SHOW):
     plt.ylabel("$Y$")
     plt.grid()
     plt.legend(loc="lower right", title="Individual\nTreatment\nEffects")
-    plt.title(f"ATT\n$E[Y_1-Y_0|T=1]$ = {ATT:0.3}")
+    plt.title(f"ATT\n$E[Y_1-Y_0|T=1]$ = {ATT:.1f}")
 
     return ATT
 
@@ -726,7 +738,7 @@ def plot_bias(causal_data, n_show=N_SHOW):
             x="X",
             y="Y0",
             s=MARKER_SIZE,
-            color=Y0_COLORS[T],
+            color=MPL_Y0_COLORS[T],
             zorder=2,
             label=f"$Y_0|T={T}$",
         )
@@ -734,7 +746,7 @@ def plot_bias(causal_data, n_show=N_SHOW):
         treatment_means.append(treatment_mean)
 
     for T in (0, 1):
-        plt.axhline(treatment_means[T], color=Y0_COLORS[T], label=f"$E[Y_0|T={T}]$")
+        plt.axhline(treatment_means[T], color=MPL_Y0_COLORS[T], label=f"$E[Y_0|T={T}]$")
 
     BIAS = bias(causal_data)
     plt.xlim((-DATA_RANGE, DATA_RANGE))
@@ -744,7 +756,7 @@ def plot_bias(causal_data, n_show=N_SHOW):
     plt.grid()
     plt.legend(loc="lower right")
 
-    plt.title(f"BIAS, $B$\n$E[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:0.3}")
+    plt.title(f"BIAS, $B$\n$E[Y_0|T=1] - E[Y_0|T=0]$ = {BIAS:.1f}")
     return BIAS
 
 
@@ -784,26 +796,21 @@ assert np.isclose(ASSOCIATION, ATT + BIAS, atol=0.01)
 - Estimating causal effect of a treatment generally requires understanding the assignment mechanism
 """
 
-change_link_color = """
-<style>
-    a:visited{
-        color:None;
-        background-color: transparent;
-        text-decoration: none;
-    }
-    a:hover{
-        color:red;
-        background-color: transparent;
-        text-decoration: none;
-    }
-    
-    a:link {
-        color: None;
-        background-color: transparent;
-        text-decoration: none;
-}
-</style>
-"""
-st.markdown(change_link_color, True)
+make_toc(
+    [
+        "Observed Outcomes and Treatments",
+        "Potential Outcomes",
+        "Treatment Effect on Treated (TET)",
+        "Average Treatment Effect (ATE)",
+        "Average Treatment Effect on the Treated (ATT)",
+        "Causation vs Association",
+        "- Bias (B)",
+        "- Association (A)",
+        "- When Association is Causation",
+        "Demo",
+        "Review",
+    ]
+)
+
 
 make_footer()
