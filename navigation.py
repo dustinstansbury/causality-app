@@ -4,17 +4,6 @@ from streamlit.components.v1 import html
 from config import SHOW_BUY_ME_A_BEER
 
 
-change_link_color = """
-<style>
-    a:link {
-    color: green;
-    background-color: transparent;
-    text-decoration: none;
-}
-</style>
-"""
-
-
 def make_toc(sections):
     """Janky generator for adding table-of-contents to the sidebar. Supports
     one level of section nesting.
@@ -79,7 +68,7 @@ def make_sidebar():
     st.set_page_config(layout="wide")
 
     with st.sidebar:
-        st.markdown(change_link_color, unsafe_allow_html=True)
+
         st.title("Causal Inference for Data Science")
 
         st.page_link("Main.py", label="Home", icon="🏠")
